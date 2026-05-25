@@ -1,0 +1,36 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+*.egg-info/
+
+# Conda
+.conda/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Data and models (too large for git)
+data/
+checkpoints/
+*.pth
+*.pt
+*.bin
+*.safetensors
+
+# Logs
+logs/
+runs/
+*.log
+wandb/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
