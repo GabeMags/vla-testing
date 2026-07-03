@@ -36,6 +36,22 @@ Independent research toward M.S. thesis in vision-language-action (VLA) robotic 
 - Known noise: pip dependency conflicts on psutil, click, torchaudio — not blocking
 - Observation: Isaac Sim startup is heavy on 3070; reducing monitor count helps
 
+### 2026-07-03: PyTorch quickstart completed
+Worked through the PyTorch quickstart tutorial (FashionMNIST classifier).
+Built conceptual understanding of:
+- Model definition with nn.Module, forward pass, and layer stacking
+- Weights vs. biases and how each is learned via gradient descent
+- Cross-entropy loss and softmax for classification
+- Training vs. evaluation modes, batch size, epochs
+- Why VRAM matters and how parameters map to memory
+
+
+
+
+
+
+
+
 ## Project structure (planned)
 vla-thesis/
 ├── README.md           # This file
