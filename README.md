@@ -46,16 +46,23 @@ Built conceptual understanding of:
 - Why VRAM matters and how parameters map to memory
 
 
+### 2026-07-07: Ran OpenVLA inference locally (quantized for my RTX3070); SmolVLA is next to compare
+Loaded up and ran inference on OpenVLA (quantized so it fits on my 3070). Giving it a random image of a cup on my desk and then later comparing it to SmolVLA which fits better on my GPU.
+- Had to fuss with a lot of mismatched libraries because I was trying to run a quantized model from 2024 on libraries from now.
+- Worked with Claude to find that OpenVLA actually recommends to just have a dedicated conda env for era-correct libs
+- Discovered that inputs need to match the weights (in my case my processor was creating an image tensor in 32 when the model weights are set to 16)
+- Learned a bunch of things in the process so I'm blurry on some things like timm, how bitsandbytes works....
 
+I used the prompt `prompt = "In: What action should the robot take to pick up the mug?\nOut:"` and got the output `Predicted 7-DOF action: [ 1.48869192e-05 -1.95259519e-02  1.83735840e-03  1.51873807e-02
+ -5.10204509e-02 -9.51627977e-02  9.96078431e-01]` when I gave it a sample image of my nasa mug on my table.
 
-
-
+ I'll need to figure out exactly what each number means.
 
 
 ## Project structure (planned)
-vla-thesis/
+vla-testing/
 ├── README.md           # This file
-├── learning/           # PyTorch fundamentals exercises (MNIST, etc.)
+├── learning/           # PyTorch fundamentals exercises(MNIST, etc.)
 ├── scripts/            # Standalone experiment scripts
 ├── envs/               # Custom Isaac Lab environments
 ├── data/               # Demonstration collection

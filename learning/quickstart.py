@@ -119,5 +119,7 @@ for t in range(epochs):
 
 print("Done!")
 
+# save the model by serializing the internal state dictionary
 torch.save(model.state_dict(), "model.pth")
 print("Saved PyTorch Model State to model.pth")
+
