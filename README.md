@@ -59,21 +59,17 @@ I used the prompt `prompt = "In: What action should the robot take to pick up th
  I'll need to figure out exactly what each number means.
 
 
-## Project structure (planned)
+## Project structure
 vla-testing/
-├── README.md           # This file
-├── learning/           # PyTorch fundamentals exercises(MNIST, etc.)
-├── scripts/            # Standalone experiment scripts
-├── envs/               # Custom Isaac Lab environments
-├── data/               # Demonstration collection
-├── model/              # Policy architecture
-└── notes/              # Paper notes, design decisions
+├── README.md
+├── learning/        # PyTorch fundamentals (quickstart.py)
+│   └── scripts/     # OpenVLA inference script
 
 ## Roadmap
-
-- [x] Day 1: Ubuntu dual-boot, NVIDIA driver
-- [x] Day 2: Isaac Sim + Isaac Lab installed, smoke test passing
-- [ ] Day 3 (Memorial Day): PyTorch fluency (MNIST), OpenVLA standalone inference
-- [ ] Week 2: OpenVLA + Isaac Lab integration, zero-shot evaluation
-- [ ] Week 3: LoRA fine-tuning on custom Isaac Lab task
-
+- [x] Environment: Ubuntu dual-boot, NVIDIA driver, Isaac Sim + Isaac Lab smoke test
+- [x] PyTorch foundations: quickstart, training loop fundamentals
+- [x] OpenVLA quantized inference running locally on RTX 3070
+- [ ] Run SmolVLA; compare against OpenVLA outputs
+- [ ] Bridge to sim: feed an Isaac Lab camera frame into OpenVLA inference
+- [ ] Closed loop: VLA actions driving the simulated Franka
+- [ ] Fine-tuning (LoRA) on a custom task — needs cloud GPU or upgraded hardware
