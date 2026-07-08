@@ -58,6 +58,9 @@ I used the prompt `prompt = "In: What action should the robot take to pick up th
 
  I'll need to figure out exactly what each number means.
 
+ A few notes:
+ OpenVLA inference runs in a separate openvla conda env (Python 3.10) with era-pinned libraries — see requirements-openvla.txt.
+
 
 ## Project structure
 vla-testing/
