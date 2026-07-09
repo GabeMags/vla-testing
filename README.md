@@ -33,5 +33,7 @@ Independent research toward M.S. thesis in vision-language-action (VLA) robotic 
 - Isaac Sim 5.1.0 (pip install)
 - Isaac Lab (cloned from main)
 
+ OpenVLA inference runs in a separate openvla conda env (Python 3.10) with era-pinned libraries — see requirements-openvla.txt.
+
 ## Research Logs
 Moved to Logs.md
