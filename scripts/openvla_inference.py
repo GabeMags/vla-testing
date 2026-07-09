@@ -13,8 +13,8 @@ model = AutoModelForVision2Seq.from_pretrained(
     device_map="auto"
 )
 
-image = Image.open("/home/gabriel/Pictures/mugontable.jpg")  # any image of a tabletop scene
-prompt = "In: What action should the robot take to pick up the mug?\nOut:"
+image = Image.open("frames/frame_000.png")  # any image of a tabletop scene
+prompt = "In: Pick up the blue cube\nOut:"
 
 inputs = processor(prompt, image).to("cuda", dtype=torch.float16)
 action = model.predict_action(**inputs, unnorm_key="bridge_orig", do_sample=False)
