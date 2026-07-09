@@ -9,6 +9,16 @@ Independent research toward M.S. thesis in vision-language-action (VLA) robotic 
 - Fine-tune VLA models on custom manipulation tasks via behavior cloning
 - Develop a research portfolio to demonstrate independent capability
 
+
+## Roadmap
+- [x] Environment: Ubuntu dual-boot, NVIDIA driver, Isaac Sim + Isaac Lab smoke test
+- [x] PyTorch foundations: quickstart, training loop fundamentals
+- [x] OpenVLA quantized inference running locally on RTX 3070
+- [ ] Run SmolVLA; compare against OpenVLA outputs
+- [X] Bridge to sim: feed an Isaac Lab camera frame into OpenVLA inference
+- [ ] Closed loop: VLA actions driving the simulated Franka
+- [ ] Fine-tuning (LoRA) on a custom task — needs cloud GPU or upgraded hardware
+
 ## Hardware
 
 - Desktop with NVIDIA RTX 3070 (8GB VRAM)
@@ -23,66 +33,5 @@ Independent research toward M.S. thesis in vision-language-action (VLA) robotic 
 - Isaac Sim 5.1.0 (pip install)
 - Isaac Lab (cloned from main)
 
-## Research Log
-
-### 2026-5-24: Initial environment setup
-- Ubuntu 22.04 dual-boot completed
-- NVIDIA driver 580 verified via `nvidia-smi`
-- conda + Python 3.11 env created (`isaaclab`)
-- PyTorch CUDA confirmed: `torch.cuda.is_available() == True`, RTX 3070 detected
-- Isaac Sim 5.1.0 installed via pip
-- Isaac Lab cloned and installed
-- Smoke test passed: `Isaac-Lift-Cube-Franka-v0` task launches and runs RL training
-- Known noise: pip dependency conflicts on psutil, click, torchaudio — not blocking
-- Observation: Isaac Sim startup is heavy on 3070; reducing monitor count helps
-
-### 2026-07-03: PyTorch quickstart completed
-Worked through the PyTorch quickstart tutorial (FashionMNIST classifier).
-Built conceptual understanding of:
-- Model definition with nn.Module, forward pass, and layer stacking
-- Weights vs. biases and how each is learned via gradient descent
-- Cross-entropy loss and softmax for classification
-- Training vs. evaluation modes, batch size, epochs
-- Why VRAM matters and how parameters map to memory
-
-
-### 2026-07-07: Ran OpenVLA inference (quantized for my RTX3070) on real photo; SmolVLA is next to compare
-Loaded up and ran inference on OpenVLA (quantized so it fits on my 3070). Giving it a real image of a cup on my desk and then later comparing it to SmolVLA which fits better on my GPU.
-- Had to fuss with a lot of mismatched libraries because I was trying to run a quantized model from 2024 on libraries from now.
-- Worked with Claude to find that OpenVLA actually recommends to just have a dedicated conda env for era-correct libs
-- Discovered that inputs need to match the weights (in my case my processor was creating an image tensor in 32 when the model weights are set to 16)
-- Learned a bunch of things in the process so I'm blurry on some things like timm, how bitsandbytes works....
-
-I used the prompt `prompt = "In: What action should the robot take to pick up the mug?\nOut:"` and got the output `Predicted 7-DOF action: [ 1.48869192e-05 -1.95259519e-02  1.83735840e-03  1.51873807e-02
- -5.10204509e-02 -9.51627977e-02  9.96078431e-01]` when I gave it a sample image of my nasa mug on my table.
-
- I'll need to figure out exactly what each number means.
-
- A few notes:
- OpenVLA inference runs in a separate openvla conda env (Python 3.10) with era-pinned libraries — see requirements-openvla.txt.
-
-### 2026-07-08: Ran OpenVLA inference on IsaacSim simulated frame
- Grabbed a tutorial script from IsaacLab that shows how to get sensors to work, created `capture_frame.py` to get IsaacSim to simulate a Franka arm with a cube on a table, then set the camera to save a frame to the project. Then ran the inference to pull the frame and determine a movement tensor to pick up the cube.
- - Had to do a lot of fussing with the simulated camera (why does it ship with such high sensitivity when navigating the 3D world?!)
- - Had to realize that OpenVLA was trained on a certain angle for the camera meaning an optimal location was a good idea
- - Running the sim headless was best for my poor GPU
- - Changed the inference code prompt to `prompt = "In: Pick up the blue cube\nOut:"` even though the cube is actually multicolored, I just wanted to see what would happen. I got back an action tensor successfully, I just don't know what that would look like. (Predicted 7-DOF action: [-0.00065614 -0.0111082  -0.00154037  0.01391019  0.02668386 -0.05970324 0.])
-
- Achieved:
- Isaac Lab scene in Isaac Sim -> camera frame -> OpenVLA -> 7 DOF action tensor
-
-
-## Project structure
-vla-testing/
-├── README.md
-├── learning/        # PyTorch fundamentals (quickstart.py)
-│   └── scripts/     # OpenVLA inference script
-
-## Roadmap
-- [x] Environment: Ubuntu dual-boot, NVIDIA driver, Isaac Sim + Isaac Lab smoke test
-- [x] PyTorch foundations: quickstart, training loop fundamentals
-- [x] OpenVLA quantized inference running locally on RTX 3070
-- [ ] Run SmolVLA; compare against OpenVLA outputs
-- [X] Bridge to sim: feed an Isaac Lab camera frame into OpenVLA inference
-- [ ] Closed loop: VLA actions driving the simulated Franka
-- [ ] Fine-tuning (LoRA) on a custom task — needs cloud GPU or upgraded hardware
+## Research Logs
+Moved to Logs.md
