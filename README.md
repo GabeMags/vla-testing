@@ -14,9 +14,10 @@ Independent research toward M.S. thesis in vision-language-action (VLA) robotic 
 - [x] Environment: Ubuntu dual-boot, NVIDIA driver, Isaac Sim + Isaac Lab smoke test
 - [x] PyTorch foundations: quickstart, training loop fundamentals
 - [x] OpenVLA quantized inference running locally on RTX 3070
-- [ ] Run SmolVLA; compare against OpenVLA outputs
+- [X] Run SmolVLA; compare against OpenVLA outputs
 - [X] Bridge to sim: feed an Isaac Lab camera frame into OpenVLA inference
 - [ ] Closed loop: VLA actions driving the simulated Franka
+- [ ] Quantized SmolVLA: measure success rate degradation when quantized to INT8/INT4
 - [ ] Fine-tuning (LoRA) on a custom task — needs cloud GPU or upgraded hardware
 
 ## Hardware
