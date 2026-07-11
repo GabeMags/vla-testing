@@ -1,6 +1,47 @@
 ## Research Logs
 
+### 2026-07-11: It's aliiiiive! Success: Closed loop SmolVLA driving IsaacSim Franka arm on RTX 3070 8GB
+I successfully ran inference closed loop, demonstrating the architecture end to end.
+
+IsaacSim takes a "photo" of the simulated Franka arm on a table with a cube -> POSTs image to SmolVLA server -> server processes one image at a time through SmolVLA -> server spat out an action back to IsaacSim client-> IsaacSim received the action -> bot moves -> start loop again.
+
+I can see the arm moving subtly by moving through the saved images in this project (see below)
+
+#### VLA + IsaacSim finally fit on RTX 3070 8GB
+
+| Configuration                              | VRAM (observed peak) | Result            |
+|--------------------------------------------|----------------------|-------------------|
+| OpenVLA (4-bit) server + Isaac Sim headless | 7.2 / 8.2 GB         | Crash (OOM)       |
+| SmolVLA server alone                        | 1.9 / 8.2 GB         | —                 |
+| SmolVLA server + Isaac Sim headless         | 5.8 / 8.2 GB         | Closed loop runs  |
+
+#### Commands
+Assume cd into project root.
+1. Activate server in terminal: `conda activate lerobot` then `python scripts/smolvla_server.py`
+2. Activate IsaacSim in another terminal: `conda activate isaaclab` then `python scripts/closed_loop_smolvla.py`
+
+#### Some things I need to address
+1. The Franka arm isn't the best choice for SmolVLA; SmolVLA outputs joint-space commands for an SO-100 which I feed into an EE-delta (IK-Rel) interface on a Franka.
+2. Camera placement; SmolVLA wants 3 camera inputs and one of them is egocentric on the EE; I'm using a weird angle (see frames below).
+3. Number of cameras; I'm only simulating one camera, so I duplicate the frame to fill in the other two expected camera frames.
+4. SmolVLA wants 6DOF joint state as part of it's input; I am not giving any state and just zeroing all that out.
+5. No fine tuning (not a hack but will help immensely)
+6. The arm moves slowly in observation; scale factor 0.05 in closed_loop.py; try 0.1-0.2.
+7. The full 200 step run took around 5s which Claude flags as unusually fast for that many inferences. Investigate this.
+
+#### Closed-loop frame sequence (every 20 steps, instruction: "pick up the blue cube")
+This only ran for around 5 seconds. Next step is to either speed things up by adjusting a scale or sensitivity, or let it run longer. SmolVLA's 6 outputs -> first 6 dims of the 7-dim IK-Rel action × 0.05, gripper pinned open.
+
+| Step 0 | Step 20 | Step 40 | Step 60 | Step 80 |
+|--------|---------|---------|---------|---------|
+| ![](frames/loop_000.png) | ![](frames/loop_020.png) | ![](frames/loop_040.png) | ![](frames/loop_060.png) | ![](frames/loop_080.png) |
+
+| Step 100 | Step 120 | Step 140 | Step 160 | Step 180 |
+|----------|----------|----------|----------|----------|
+| ![](frames/loop_100.png) | ![](frames/loop_120.png) | ![](frames/loop_140.png) | ![](frames/loop_160.png) | ![](frames/loop_180.png) |
+
 ### 2026-07-10: Attempted closed loop OpenVLA; pivot to SmolVLA due to GPU mem constraint (8GB)
+##### Biggest finding: SmolVLA takes up significantly less VRAM on my RTX 3070: 2047MiB / 8192MiB observed peak when running inference!
 I attempted to get a basic flask server running to get a closed loop inference on quantized (4bit) OpenVLA with IsaacSim Franka and a cube. This failed because I kept running into memory issues having the quantized model running then attempting to run a headless IsaacSim instance to give the model server a frame to analyze. I even dumbed down the simulated camera resolution to 256x256, unplugged all but one monitor, closed all unnecessary apps, and it still wasn't enough. I made the decision to try and move to SmolVLA which should be better given that it seems to have been made with consumer hardware memory constraints in mind.
 - With quantized OpenVLA server running and headless IsaacSim, it takes up around 7.2/8.2GB on my RTX 3070 and that's including the fact that IsaacSim returns failures. Maybe it would be even more if it had the room.
 - I'm still going to have a local server running to get this to work closed-loop; flask server running the VLA <--> IsaacSim Franka with cube
