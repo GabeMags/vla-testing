@@ -27,7 +27,7 @@ Assume cd into project root.
 4. SmolVLA wants 6DOF joint state as part of it's input; I am not giving any state and just zeroing all that out.
 5. No fine tuning (not a hack but will help immensely)
 6. The arm moves slowly in observation; scale factor 0.05 in closed_loop.py; try 0.1-0.2.
-7. The full 200 step run took around 5s which Claude flags as unusually fast for that many inferences. Investigate this.
+7. The full 200 step run took around 5s which when I asked Claude about this, it flags as unusually fast for that many inferences. Investigate this.
 
 #### Closed-loop frame sequence (every 20 steps, instruction: "pick up the blue cube")
 This only ran for around 5 seconds. Next step is to either speed things up by adjusting a scale or sensitivity, or let it run longer. SmolVLA's 6 outputs -> first 6 dims of the 7-dim IK-Rel action × 0.05, gripper pinned open.
