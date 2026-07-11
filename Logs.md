@@ -5,7 +5,18 @@ I attempted to get a basic flask server running to get a closed loop inference o
 - With quantized OpenVLA server running and headless IsaacSim, it takes up around 7.2/8.2GB on my RTX 3070 and that's including the fact that IsaacSim returns failures. Maybe it would be even more if it had the room.
 - I'm still going to have a local server running to get this to work closed-loop; flask server running the VLA <--> IsaacSim Franka with cube
 
+#### SmolVLA inference success
+##### Biggest finding: SmolVLA takes up significantly less VRAM on my RTX 3070: 2047MiB / 8192MiB observed peak when running inference!
+I configured a conda env for SmolVLA and got it inferring from the same simulated frame I was using on OpenVLA the other day. It returns a 6 DOF joint space action. I'll have to adjust the workflow though because SmolVLA has different inputs/outputs than OpenVLA:
+- SmolVLA likes an input of a 3-item dict; [3 camera frames, 6DOF joint state, instruction] which is different than what OpenVLA wanted; [1 camera frame, instruction]
+- SmolVLAs output is also a 6DOF joint state that it post processes to a tensor
 
+I ran a SmolVLA test on the same image from last time when I got OpenVLA inferring on an IsaacSim image: ![Isaac Sim frame fed to both VLAs](frames/frame_000.png)
+
+It gave the following output: `torch.Size([1, 6]) tensor([[ 0.0941, -0.0266,  0.1428, -0.2455,  0.1304,  0.5694]])`
+I used smolvla_test.py which was developed with Claude as I figured out how to trick SmolVLA into thinking it's getting 3 camera feed frames when I'm only giving it one.
+
+Next step is closed loop with IsaacSim!
 
 ### 2026-07-08: Ran OpenVLA inference on IsaacSim simulated frame
  Grabbed a tutorial script from IsaacLab that shows how to get sensors to work, created `capture_frame.py` to get IsaacSim to simulate a Franka arm with a cube on a table, then set the camera to save a frame to the project. Then ran the inference to pull the frame and determine a movement tensor to pick up the cube.
