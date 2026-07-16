@@ -1,26 +1,37 @@
-# closed_loop.py — run via: ./isaaclab.sh -p closed_loop.py --enable_cameras
+# Standard library
 import argparse
-from isaaclab.app import AppLauncher
+import datetime
+import io
+import os
 
+# Third-party
+import numpy as np
+import requests
+import torch
+from PIL import Image
+
+# Isaac Lab
+from isaaclab.app import AppLauncher
 parser = argparse.ArgumentParser()
 AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
-args_cli.headless = True
+args_cli.headless = False
 args_cli.enable_cameras = True
 app_launcher = AppLauncher(args_cli)
 simulation_app = app_launcher.app
-
-import torch
-import numpy as np
-from PIL import Image
 import gymnasium as gym
 import isaaclab.sim as sim_utils
 from isaaclab.sensors import CameraCfg
 import isaaclab_tasks  # registers the tasks
 from isaaclab_tasks.utils import parse_env_cfg
 
+# Adjustable vars
+SCALE = 0.5 #scale by which smolvla operates on the arm
+LENGTH_S = 30 #how long the sim has before it times out
+
 # --- build env config, then INJECT the camera into its scene ---
 env_cfg = parse_env_cfg("Isaac-Lift-Cube-Franka-IK-Rel-v0", num_envs=1)
+env_cfg.episode_length_s = LENGTH_S 
 env_cfg.scene.external_cam = CameraCfg(
     prim_path="{ENV_REGEX_NS}/external_cam",
     update_period=0.1,
@@ -48,8 +59,25 @@ zero_action = torch.zeros((1, 7), device=env.unwrapped.device)
 for _ in range(50):
     env.step(zero_action)
 
-#request
-import requests, io
+
+# Frames folder for today's images
+def get_output_dir(scale):
+    """Get unique output directory with date, scale, and run counter."""
+    base_dir = "/home/gabriel/vla-testing/frames"
+    date_str = datetime.date.today().strftime("%Y-%m-%d")
+    run_counter = 0
+    
+    while True:
+        run_name = f"{date_str}_scale-{scale}_{run_counter}"
+        out_dir = os.path.join(base_dir, run_name)
+        if not os.path.exists(out_dir):
+            os.makedirs(out_dir, exist_ok=True)
+            return out_dir
+        run_counter += 1
+
+out_dir = get_output_dir(SCALE)
+
+# Request
 for step in range(200):
     joint_pos = env.unwrapped.scene["robot"].data.joint_pos[0][:6]   # first 6 of Franka's 9
     state_str = ",".join(f"{v:.4f}" for v in joint_pos.cpu().numpy())
@@ -65,13 +93,14 @@ for step in range(200):
     # SmolVLA uses 6 dims but the franka wants 7
     a6 = torch.tensor(r.json()["action"], dtype=torch.float32, device=env.unwrapped.device)
     a = torch.zeros(7, device=env.unwrapped.device)
-    a[:6] = a6 * 0.05
+    a[:6] = a6 * SCALE
     a[6] = 1.0
     env.step(a.unsqueeze(0))
 
+    # Save frame
     print(f"step {step}: action {a.cpu().numpy().round(4)}")
     if step % 20 == 0:
-        Image.fromarray(rgb_np).save(f"/home/gabriel/vla-testing/frames/loop_{step:03d}.png")
+        Image.fromarray(rgb_np).save(os.path.join(out_dir, f"loop_{step:03d}.png"))
 
 env.close()
 simulation_app.close()

@@ -1,5 +1,30 @@
 ## Research Logs
 
+### 2026-07-15: Does SmolVLA run better if I increase scale
+Short answer no. I'm able to observe a lot more per session though.
+
+I thought I properly increased scale from 0.05 to 0.1, then 0.5. Turns out I was editing the wrong part of code and I have a bunch of frames for the same scale of 0.01
+- Created better naming conventions for frames
+- Started running IsaacSim not-headless because I have room for it VRAM wise now that I'm using SmolVLA (~6.4/8GB observed peak)
+
+Actually changed scales.
+#### Scale factor sweep (instruction: "pick up the blue cube")
+
+| Scale | Cube interaction (Y/N) | Notes |
+|-------|:----------------------:|-------|
+| 0.05  | N | The arm is just awkwardly moving itself "up"    |
+| 0.15  | N | The arm did make a better attempt to move itself down towards the cube but did not meet the EE with the cube. This was the closest it got. |
+| 0.5   | N | The arm was just as awkward as the first scale, and this time rotated away from the cube then back down. It was making a lot of adjustments, and it was doing a lot more within the time frame but still did not meet the cube.
+
+This is the first time I'm seeing that the VLA is doing different solutions every time, not just one solution every time I run it. It's trying different things because a lot of the information I'm giving it is OOD.
+
+Bottom line, this needs:
+- I need to actually give joint state back to SmolVLA
+- ability to open and close the gripper
+- a different arm would be best
+- maybe better camera angles or just more cameras given that SmolVLA would do well with 3 inputs
+
+
 ### 2026-07-11: It's aliiiiive! Success: Closed loop SmolVLA driving IsaacSim Franka arm on RTX 3070 8GB
 I successfully ran inference closed loop, demonstrating the architecture end to end.
 
