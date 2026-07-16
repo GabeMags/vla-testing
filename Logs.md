@@ -3,7 +3,7 @@
 ### 2026-07-15: Does SmolVLA run better if I increase scale
 Short answer no. I'm able to observe a lot more per session though.
 
-I thought I properly increased scale from 0.05 to 0.1, then 0.5. Turns out I was editing the wrong part of code and I have a bunch of frames for the same scale of 0.01
+I thought I properly increased scale from 0.05 to 0.1, then 0.5. Turns out I was editing the wrong part of code and I have a bunch of frames for the same scale of 0.01, so I changed their names for future reference- might as well keep them for the sake of learning.
 - Created better naming conventions for frames
 - Started running IsaacSim not-headless because I have room for it VRAM wise now that I'm using SmolVLA (~6.4/8GB observed peak)
 
