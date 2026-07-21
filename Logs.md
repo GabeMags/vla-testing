@@ -1,6 +1,8 @@
 ## Research Logs
 
 ### 2026-07-15: Does SmolVLA run better if I increase scale
+
+### 2026-07-15: Does SmolVLA run better if I increase scale
 Short answer no. I'm able to observe a lot more per session though.
 
 I thought I properly increased scale from 0.05 to 0.1, then 0.5. Turns out I was editing the wrong part of code and I have a bunch of frames for the same scale of 0.01, so I changed their names for future reference- might as well keep them for the sake of learning.
@@ -15,6 +17,11 @@ Actually changed scales.
 | 0.05  | N | The arm is just awkwardly moving itself "up"    |
 | 0.15  | N | The arm did make a better attempt to move itself down towards the cube but did not meet the EE with the cube. This was the closest it got. |
 | 0.5   | N | The arm was just as awkward as the first scale, and this time rotated away from the cube then back down. It was making a lot of adjustments, and it was doing a lot more within the time frame but still did not meet the cube.
+
+| Scale 0.05 | Scale 0.15 | Scale 0.5 |
+|--------|---------|---------|
+| ![](frames/2026-07-15_scale-0.05_3/closed_loop.gif) | ![](frames/2026-07-15_scale-0.15_0/closed_loop.gif) | ![](frames/2026-07-15_scale-0.5_0/closed_loop.gif)
+
 
 This is the first time I'm seeing that the VLA is doing different solutions every time, not just one solution every time I run it. It's trying different things because a lot of the information I'm giving it is OOD.
 
@@ -59,11 +66,11 @@ This only ran for around 5 seconds. Next step is to either speed things up by ad
 
 | Step 0 | Step 20 | Step 40 | Step 60 | Step 80 |
 |--------|---------|---------|---------|---------|
-| ![](frames/loop_000.png) | ![](frames/loop_020.png) | ![](frames/loop_040.png) | ![](frames/loop_060.png) | ![](frames/loop_080.png) |
+| ![](frames/2026-07-11_scale-0.05/loop_000.png) | ![](frames/2026-07-11_scale-0.05/loop_020.png) | ![](frames/2026-07-11_scale-0.05/loop_040.png) | ![](frames/2026-07-11_scale-0.05/loop_060.png) | ![](frames/2026-07-11_scale-0.05/loop_080.png) |
 
 | Step 100 | Step 120 | Step 140 | Step 160 | Step 180 |
 |----------|----------|----------|----------|----------|
-| ![](frames/loop_100.png) | ![](frames/loop_120.png) | ![](frames/loop_140.png) | ![](frames/loop_160.png) | ![](frames/loop_180.png) |
+| ![](frames/2026-07-11_scale-0.05/loop_100.png) | ![](frames/2026-07-11_scale-0.05/loop_120.png) | ![](frames/2026-07-11_scale-0.05/loop_140.png) | ![](frames/2026-07-11_scale-0.05/loop_160.png) | ![](frames/2026-07-11_scale-0.05/loop_180.png) |
 
 ### 2026-07-10: Attempted closed loop OpenVLA; pivot to SmolVLA due to GPU mem constraint (8GB)
 ##### Biggest finding: SmolVLA takes up significantly less VRAM on my RTX 3070: 2047MiB / 8192MiB observed peak when running inference!
