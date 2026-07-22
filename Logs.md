@@ -1,6 +1,25 @@
 ## Research Logs
 
-### 2026-07-15: Does SmolVLA run better if I increase scale
+### 2026-07-21: Does SmolVLA run better if I change the arm (pt1)
+#### Getting the SO-100 robot arm in IsaacLab
+SmolVLA was trained on the SO-100 so I'm just starting to match the distribution to get a better result.
+I found a community repo that implements tasks for the SO‑ARM100 and SO‑ARM101 robots using Isaac Lab.
+
+Cloned https://github.com/MuammerBay/isaac_so_arm101 . Didn't use uv- I have pip venv set up already for IsaacLab. The repo uses the same Python and IsaacLab versions I'm using which was lucky!
+
+This repo is an external project, meaning it defines its own robot configs, task configs, and scripts in its own package.
+I activated my isaaclab venv (`conda activate isaaclab`), installed into my isaaclab venv with `pip install -e . --no-deps` which cleanly allows me to just use my venv's deps for the repo.
+
+I ran `list_envs`
+![](screenshots/Screenshot%20from%202026-07-21%2021-15-26.png)
+**I learned that the `play` suffix means you're not using this task for training and just for inference.**
+
+
+I tried to run the task from the repo readme quickstart `Isaac-SO-ARM100-Reach-Play-v0` and it ran successfully. The arms are doing nothing because there's no VLA working with them.:
+
+![](screenshots/Screenshot%20from%202026-07-21%2021-14-00.png)
+
+Quick win for today to just get the right arm into the sim. Tomorrow I'll try to plumb SmolVLA to get the arms moving.
 
 ### 2026-07-15: Does SmolVLA run better if I increase scale
 Short answer no. I'm able to observe a lot more per session though.
