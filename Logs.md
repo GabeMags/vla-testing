@@ -52,7 +52,8 @@ step 74: action(rad) [ 0.0642 -0.0024  0.0298 -0.0823  0.0466 -0.0199]
 ```
 
 </details>
-<br>
+
+
 #### Side test: Can I run inference with 3 monitors? 
 I recently upgraded my monitor setup and now I'm driving 2x1080p and 1x1440p monitor (3 monitors). This is 1 extra monitor than before but it's negligible. I was able to run inference just fine. The following is what I observed with no scripts running, just hot plugging a monitor.
 
