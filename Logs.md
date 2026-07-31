@@ -1,5 +1,65 @@
 ## Research Logs
 
+### 2026-07-30: Can SmolVLA pick up the cube zero shot using the SO-100/SO-101 arms?
+
+Today's answer: No. Needs param adjustments. Ran one So-100 test today and will run more tests in another session.
+
+*Notes:*
+<br>
+SmolVLA expects SO-100 convention order for a 6-dim action space (shoulder_pan, shoulder_lift, elbow_flex, wrist_flex, wrist_roll, gripper), and the Franka arm was 7. SmolVLA was also trained with this arm series.
+
+I did side testing to see if more monitors affected my VRAM. It didn't (see "Side test" below SO-100 testing).
+
+I had to `import isaac_so_arm101.tasks` because 100 was returning not found. I hope this doesn't affect SO-100 testing.
+
+#### SO-100 testing
+
+**Test 1**: The arm barely moved; the gripper moved the most. I expected far more arm motion. Some params need changing. Hypotheses: camera angle and/or arm color throwing off the model (still-untested visual OOD), or an action-semantics mismatch. Worth noting: the VLA gave consistently small commands, then occasionally a wild jump (see the test 1 action log dropdown).
+
+![SO-100 test 1 minimal motion](frames/2026-07-30_soarm-lift_0/soarm_run.gif)
+
+<details>
+<summary>Test 1 action log steps 48–74 (radians, post deg→rad conversion). Shows some wild changes in steps 51 and 68.</summary>
+
+```
+step 48: action(rad) [ 0.      0.0149  0.0156 -0.0048  0.0443  0.131 ]
+step 49: action(rad) [-0.0011  0.0134  0.0147 -0.0102  0.0433  0.1351]
+step 50: action(rad) [ 0.0055  0.0038 -0.0015 -0.0123  0.095  -0.0174]
+step 51: action(rad) [ 4.00e-03  6.20e-03 -1.00e-04 -1.46e-02  8.89e-02 -1.80e-02]
+step 52: action(rad) [ 0.0096  0.0091  0.0086 -0.0215  0.0993 -0.0186]
+step 53: action(rad) [ 0.0098  0.0106  0.0136 -0.0208  0.0956 -0.0176]
+step 54: action(rad) [ 0.0132  0.012   0.0196 -0.007   0.0839 -0.0174]
+step 55: action(rad) [ 0.0116  0.0132  0.0214 -0.0087  0.0847 -0.0171]
+step 56: action(rad) [ 0.012   0.0147  0.0224 -0.0093  0.0833 -0.0168]
+step 57: action(rad) [ 0.0136  0.014   0.0214 -0.0137  0.0777 -0.0174]
+step 58: action(rad) [ 0.017   0.0113  0.0194 -0.0239  0.0748 -0.0177]
+step 59: action(rad) [ 0.0217  0.0096  0.0201 -0.029   0.0723 -0.0182]
+step 60: action(rad) [ 0.0245  0.0098  0.0204 -0.0316  0.0695 -0.0187]
+step 61: action(rad) [ 0.0291  0.0095  0.0202 -0.0373  0.0651 -0.02  ]
+step 62: action(rad) [ 0.0307  0.0084  0.0197 -0.0403  0.0636 -0.0197]
+step 63: action(rad) [ 0.0318  0.0074  0.0204 -0.0433  0.062  -0.0191]
+step 64: action(rad) [ 0.034   0.0053  0.0213 -0.0492  0.0606 -0.0194]
+step 65: action(rad) [ 0.037   0.0029  0.0211 -0.0531  0.0595 -0.0194]
+step 66: action(rad) [ 0.042   0.0011  0.019  -0.0556  0.0593 -0.0201]
+step 67: action(rad) [ 0.045   0.0003  0.0175 -0.0561  0.0585 -0.0198]
+step 68: action(rad) [ 5.03e-02 -1.00e-04  1.96e-02 -5.97e-02  5.64e-02 -1.99e-02]
+step 69: action(rad) [ 0.0543 -0.0005  0.0199 -0.0632  0.0544 -0.0202]
+step 70: action(rad) [ 0.0579 -0.0009  0.0214 -0.0651  0.0517 -0.0203]
+step 71: action(rad) [ 0.0594 -0.0013  0.0215 -0.0662  0.0502 -0.0202]
+step 72: action(rad) [ 0.0624 -0.002   0.0241 -0.073   0.0499 -0.0199]
+step 73: action(rad) [ 0.063  -0.0025  0.0259 -0.0771  0.0489 -0.0196]
+step 74: action(rad) [ 0.0642 -0.0024  0.0298 -0.0823  0.0466 -0.0199]
+```
+
+</details>
+<br>
+#### Side test: Can I run inference with 3 monitors? 
+I recently upgraded my monitor setup and now I'm driving 2x1080p and 1x1440p monitor (3 monitors). This is 1 extra monitor than before but it's negligible. I was able to run inference just fine. The following is what I observed with no scripts running, just hot plugging a monitor.
+
+ Before | After (1x1080p monitor added) | 
+|-------|:----------------------:|
+| ~1.1/8GB  | ~1.1/8GB | 
+
 ### 2026-07-21: Does SmolVLA run better if I change the arm (pt1)
 #### Getting the SO-100 robot arm in IsaacLab
 SmolVLA was trained on the SO-100 so I'm just starting to match the distribution to get a better result.

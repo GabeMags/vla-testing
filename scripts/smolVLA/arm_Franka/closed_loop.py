@@ -45,7 +45,7 @@ env_cfg.scene.external_cam = CameraCfg(
     # Quaternion (w,x,y,z), ROS convention. Iterate on this after seeing the first frame.
     offset=CameraCfg.OffsetCfg(pos=(1.6, 0.0, 0.9), convention="ros"),
 )
-env_cfg.commands.object_pose.debug_vis = False
+env_cfg.commands.object_pose.debug_vis = False #Franka specific
 
 env = gym.make("Isaac-Lift-Cube-Franka-IK-Rel-v0", cfg=env_cfg)
 obs, _ = env.reset()
