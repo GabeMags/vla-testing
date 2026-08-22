@@ -21,6 +21,11 @@ I added front-left cam to see if there was a meaningful difference. There was no
 | ![](frames/2026-08-22_soarm-lift_front_right_white_1/gifs/soarm_run.gif) | ![](frames/2026-08-22_soarm-lift_front_right_white_1/gifs/soarm_run_wrist.gif) | ![](frames/2026-08-22_soarm-lift_front_right_white_1/gifs/soarm_run_cam2.gif)
 
 #### Attempt 3 - swap to SO101 arm (SO-101)
+This also did not help. Even though the cube spawned outside of the wrist's camera, the other cameras showed it and it should have at least moved the joints other than the wrist. I think this narrows down the issue to the joints themselves.
+
+| Front Right Cam (attempt 3) | Wrist Cam (attempt 3) | Front Left Cam (attempt 3) |
+|---------------------|---------------------|---------------------|
+| ![](frames/2026-08-22_so101-lift_front_right_white_0/gifs/soarm_run.gif) | ![](frames/2026-08-22_so101-lift_front_right_white_0/gifs/soarm_run_wrist.gif) | ![](frames/2026-08-22_so101-lift_front_right_white_0/gifs/soarm_run_cam2.gif)
 
 ### 2026-08-03: Can SmolVLA pick up the cube zero shot using the SO-100/SO-101 arms? (pt. 2)
 

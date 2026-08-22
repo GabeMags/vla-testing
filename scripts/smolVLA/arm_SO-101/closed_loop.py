@@ -1,4 +1,4 @@
-# Closed-loop SmolVLA -> IsaacSim SO-ARM100.
+# Closed-loop SmolVLA -> IsaacSim SO-ARM101.
 # Scene is distribution-matched to SmolVLA's SO-100 training data via scene_match.py:
 # debug markers off, webcam-like 4:3 camera framing the whole arm, wrist cam, realistic
 # arm color. See scene_match.py for the reasoning behind each.
@@ -42,9 +42,9 @@ import scene_match as sm        # type: ignore
 
 # Adjustable vars
 LENGTH_S = 30   # episode timeout (sim-seconds) before env auto-resets
-# This folder is SO-ARM100 only -- the arm is pinned, not a flag, so a run can never
-# be mislabelled. The SO-ARM101 copy lives in ../arm_SO-101.
-ARM = "so100"
+# This folder is SO-ARM101 only -- the arm is pinned, not a flag, so a run can never
+# be mislabelled. The SO-ARM100 copy lives in ../arm_SO-100.
+ARM = "so101"
 TASK = sm.ARMS[ARM]["task"]
 
 env_cfg = parse_env_cfg(TASK, num_envs=1)

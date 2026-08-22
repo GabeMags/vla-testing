@@ -42,7 +42,7 @@ from isaaclab_tasks.utils import parse_env_cfg
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import scene_match as sm
 
-ARM = "so100"          # pinned: this folder is SO-ARM100 only
+ARM = "so101"          # pinned: this folder is SO-ARM101 only
 TASK = sm.ARMS[ARM]["task"]
 
 env_cfg = parse_env_cfg(TASK, num_envs=1)

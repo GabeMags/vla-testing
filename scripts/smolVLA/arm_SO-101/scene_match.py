@@ -1,4 +1,4 @@
-"""Push the sim scene toward SmolVLA's SO-100/101 training distribution (SO-ARM100 copy).
+"""Push the sim scene toward SmolVLA's SO-100/101 training distribution (SO-ARM101 copy).
 
 Import this from the closed-loop / preview scripts *after* AppLauncher has started.
 """
@@ -103,7 +103,7 @@ ARMS = {
         wrist_up=(0.0, 1.0, 0.0),
     ),
 }
-DEFAULT_ARM = "so100"
+DEFAULT_ARM = "so101"
 
 
 # --- wrist camera ----------------------------------------------------------------------
