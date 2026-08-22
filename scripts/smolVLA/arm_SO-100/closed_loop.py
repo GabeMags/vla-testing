@@ -21,6 +21,7 @@ from isaaclab.app import AppLauncher
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--preset", default="front_right", help="Camera preset (see scene_match.CAMERA_PRESETS).")
+parser.add_argument("--preset2", default="front_left", help="Second third-person view; pass '' to disable.")
 parser.add_argument("--arm-color", default="white", choices=["white", "black", "yellow"])
 parser.add_argument("--no-wrist", action="store_true", help="Duplicate the third-person view into all 3 slots.")
 parser.add_argument("--steps", type=int, default=200)
@@ -48,12 +49,15 @@ env_cfg.episode_length_s = LENGTH_S
 
 # --- distribution matching (all three must happen before gym.make) ---
 sm.disable_debug_vis(env_cfg)   # frame triads / goal markers never appear in training data
-sm.add_scene_cameras(env_cfg, preset=args_cli.preset, wrist=not args_cli.no_wrist)
+sm.add_scene_cameras(env_cfg, preset=args_cli.preset, preset2=args_cli.preset2 or None,
+                     wrist=not args_cli.no_wrist)
 
 env = gym.make(TASK, cfg=env_cfg)
 obs, _ = env.reset()
 
 sm.aim_external_cam(env, args_cli.preset)
+if args_cli.preset2:
+    sm.aim_external_cam(env, args_cli.preset2, cam_name="external_cam2")
 sm.recolor_arm(body_color=args_cli.arm_color)   # yellow -> white PLA; servos stay black
 
 # Zero action sized from the env itself — never hardcode action dims
@@ -106,6 +110,8 @@ for step in range(args_cli.steps):
     files = {"image": as_png(ext)}
     if use_wrist:
         files["wrist"] = as_png(grab("wrist_cam"))
+    if args_cli.preset2:
+        files["image2"] = as_png(grab("external_cam2"))
 
     # --- inference over HTTP ---
     r = requests.post("http://127.0.0.1:8000/act",
@@ -121,6 +127,8 @@ for step in range(args_cli.steps):
         Image.fromarray(ext).save(os.path.join(out_dir, f"loop_{step:03d}.png"))
         if use_wrist:
             Image.fromarray(grab("wrist_cam")).save(os.path.join(out_dir, f"wrist_{step:03d}.png"))
+        if args_cli.preset2:
+            Image.fromarray(grab("external_cam2")).save(os.path.join(out_dir, f"cam2_{step:03d}.png"))
 
 env.close()
 simulation_app.close()

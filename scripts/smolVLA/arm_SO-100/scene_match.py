@@ -1,21 +1,5 @@
 """Push the sim scene toward SmolVLA's SO-100 training distribution.
 
-Three things separated our render (2026-07-30 run) from a real SO-100 LeRobot recording:
-
-  1. Debug-vis markers. The lift task paints a frame triad on the gripper and a goal-pose
-     triad in the workspace (``debug_vis=True`` in the upstream cfg). Big saturated RGB
-     arrows over the end effector appear in exactly zero training frames.
-  2. Camera. Community SO-100 recordings use a cheap webcam ~0.4-0.6 m from the workspace,
-     ~0.25-0.45 m above the table, angled down 20-40 deg, with the *whole arm* in frame --
-     plus a wrist cam. We had a narrow 47 deg lens 1.4 m away, cropping the arm out of frame.
-  3. Arm color. The URDF ships saturated yellow for the printed parts; community SO-100/101
-     builds are overwhelmingly white or black PLA with black STS3215 servos.
-
-Aspect ratio note: SmolVLA's ``resize_imgs_with_padding=(512, 512)`` does an aspect-preserving
-resize and then pads left/top (see ``resize_with_pad`` in modeling_smolvla.py). A real 640x480
-frame therefore reaches SigLIP as 512x384 content with a 128 px black bar on top. A square
-render produces no bar at all, so rendering 4:3 reproduces the letterbox the model trained on.
-
 Import this from the closed-loop / preview scripts *after* AppLauncher has started.
 """
 
@@ -151,36 +135,47 @@ def disable_debug_vis(env_cfg):
 def add_scene_cameras(
     env_cfg,
     preset=DEFAULT_PRESET,
+    preset2="front_left",
     width=DEFAULT_WIDTH,
     height=DEFAULT_HEIGHT,
     wrist=True,
     gripper_body="gripper",
 ):
-    """Attach a third-person camera and (optionally) a wrist camera to the scene config.
+    """Attach two third-person cameras and (optionally) a wrist camera to the scene config.
 
-    The third-person pose here is a placeholder; ``aim_external_cam`` sets it for real after
-    reset, which is what lets us re-aim between presets without rebuilding the env.
+    smolvla_base declares three image slots with ``empty_cameras: 0``, so all three want a
+    real tensor. ``preset``/``preset2`` fill two of them with distinct third-person views;
+    the wrist cam fills the third. Pass ``preset2=None`` for the older 2-camera setup.
+
+    The third-person poses here are placeholders; ``aim_external_cam`` sets them for real
+    after reset, which is what lets us re-aim between presets without rebuilding the env.
     """
     import isaaclab.sim as sim_utils
     from isaaclab.sensors import CameraCfg
 
     cfg = CAMERA_PRESETS[preset]
 
-    env_cfg.scene.external_cam = CameraCfg(
-        prim_path="{ENV_REGEX_NS}/external_cam",  # world-fixed, not parented to the robot
-        update_period=0.0,  # render every step; the loop reads a frame every step
-        height=height,
-        width=width,
-        data_types=["rgb"],
-        spawn=sim_utils.PinholeCameraCfg(
-            focal_length=focal_length_for_hfov(cfg["hfov"]),
-            focus_distance=400.0,
-            horizontal_aperture=HORIZONTAL_APERTURE,
-            # vertical_aperture=None -> derived from height/width, so pixels stay square.
-            clipping_range=(0.01, 1.0e5),
-        ),
-        offset=CameraCfg.OffsetCfg(pos=cfg["eye"], convention="ros"),
-    )
+    def world_cam(name, preset_name):
+        c = CAMERA_PRESETS[preset_name]
+        return CameraCfg(
+            prim_path="{ENV_REGEX_NS}/" + name,  # world-fixed, not parented to the robot
+            update_period=0.0,  # render every step; the loop reads a frame every step
+            height=height,
+            width=width,
+            data_types=["rgb"],
+            spawn=sim_utils.PinholeCameraCfg(
+                focal_length=focal_length_for_hfov(c["hfov"]),
+                focus_distance=400.0,
+                horizontal_aperture=HORIZONTAL_APERTURE,
+                # vertical_aperture=None -> derived from height/width, so pixels stay square.
+                clipping_range=(0.01, 1.0e5),
+            ),
+            offset=CameraCfg.OffsetCfg(pos=c["eye"], convention="ros"),
+        )
+
+    env_cfg.scene.external_cam = world_cam("external_cam", preset)
+    if preset2:
+        env_cfg.scene.external_cam2 = world_cam("external_cam2", preset2)
 
     if wrist:
         # Parented to the fixed jaw (`gripper` link; `jaw` is the moving one), like a real
@@ -207,25 +202,28 @@ def add_scene_cameras(
 
     print(
         f"[scene_match] cameras: external={width}x{height} @ {cfg['hfov']:.0f} deg hfov "
-        f"(preset '{preset}'), wrist={'on' if wrist else 'off'}"
+        f"(preset '{preset}'), external2={preset2 or 'off'}, wrist={'on' if wrist else 'off'}"
     )
     return env_cfg
 
 
-def aim_external_cam(env, preset=DEFAULT_PRESET):
-    """Point the third-person camera at the workspace. Call after env.reset()."""
+def aim_external_cam(env, preset=DEFAULT_PRESET, cam_name="external_cam"):
+    """Point a third-person camera at the workspace. Call after env.reset()."""
     import torch
 
     cfg = CAMERA_PRESETS[preset]
     device = env.unwrapped.device
     eye = torch.tensor([cfg["eye"]], device=device)
     target = torch.tensor([cfg["target"]], device=device)
-    env.unwrapped.scene["external_cam"].set_world_poses_from_view(eyes=eye, targets=target)
+    env.unwrapped.scene[cam_name].set_world_poses_from_view(eyes=eye, targets=target)
 
     dx, dy, dz = (e - t for e, t in zip(cfg["eye"], cfg["target"]))
     dist = math.sqrt(dx * dx + dy * dy + dz * dz)
     elev = math.degrees(math.atan2(dz, math.hypot(dx, dy)))
-    print(f"[scene_match] preset '{preset}': {dist:.2f} m out, {elev:.0f} deg above -- {cfg['note']}")
+    print(
+        f"[scene_match] {cam_name} preset '{preset}': {dist:.2f} m out, "
+        f"{elev:.0f} deg above -- {cfg['note']}"
+    )
     return cfg
 
 
@@ -296,15 +294,19 @@ def list_arm_materials(path_contains="/Robot"):
 def recolor_arm(
     body_color="white",
     servo_color=None,
-    body_match="3d_printed",
+    body_match="printed",
     servo_match="sts3215",
     roughness=0.65,
     path_contains="/Robot",
 ):
     """Repaint the printed arm parts (and optionally the servos). Call after env.reset().
 
-    Matching is by material-name substring, falling back to the URDF's source RGB when the
-    importer renamed things. Returns the list of shader paths actually touched.
+    Matching is by material-name substring, falling back to the URDF's source RGB. Note the
+    substring is "printed", not "3d_printed": the URDF importer rejects a leading digit and
+    logs `The path 3d_printed is not a valid usd path, modifying to a_d_printed`, so the
+    literal URDF name never appears on the stage. "printed" matches either spelling, which
+    also makes the recolor idempotent -- matching on the source RGB alone would fail on a
+    second call, because by then the parts are no longer yellow.
     """
     from pxr import Gf
 

@@ -4,15 +4,23 @@
 
 ### 2026-08-22: Can SmolVLA pick up the cube zero shot using the SO-100/SO-101 arms? (pt. 3)
 
-Today I'm testing whether or not the adjustments made last session meaningfully allow SmolVLA to pick up the cube using SO-100 arm.
+Today I'm testing whether or not the adjustments made last session meaningfully allow SmolVLA to pick up the cube using SO-100/101 arms ("Pick up the blue cube").
 
-#### "Pick up the blue cube"
-First pass without changing anything from last session; the arm fails.
+#### Attempt 1 - no change from last session (SO-100)
+First pass without changing anything from last session; the arm fails. My guess is that we need to give SmolVLA a true 3-camera solution instead of duplicating the 3rd person view for the 3rd camera.
 
-| Front Right Cam | Wrist Cam |
+| Front Right Cam (attempt 1) | Wrist Cam (attempt 1) |
 |---------------------|---------------------|
 | ![](frames/2026-08-22_soarm-lift_front_right_white_0/gifs/soarm_run.gif) | ![](frames/2026-08-22_soarm-lift_front_right_white_0/gifs/soarm_run_wrist.gif) |
 
+#### Attempt 2 - add a 3rd camera view (SO-100)
+I added front-left cam to see if there was a meaningful difference. There was not. I'm keeping this setup moving forward, but it was not the fix. The gripper is moving fine but not the joints. Will be swapping the arm for SO-101. 
+
+| Front Right Cam (attempt 2) | Wrist Cam (attempt 2) | Front Left Cam (attempt 2) |
+|---------------------|---------------------|---------------------|
+| ![](frames/2026-08-22_soarm-lift_front_right_white_1/gifs/soarm_run.gif) | ![](frames/2026-08-22_soarm-lift_front_right_white_1/gifs/soarm_run_wrist.gif) | ![](frames/2026-08-22_soarm-lift_front_right_white_1/gifs/soarm_run_cam2.gif)
+
+#### Attempt 3 - swap to SO101 arm (SO-101)
 
 ### 2026-08-03: Can SmolVLA pick up the cube zero shot using the SO-100/SO-101 arms? (pt. 2)
 

@@ -47,7 +47,9 @@ TASK = "Isaac-SO-ARM100-Lift-Cube-Play-v0"
 env_cfg = parse_env_cfg(TASK, num_envs=1)
 env_cfg.episode_length_s = 1000.0  # no auto-reset while we sweep poses
 sm.disable_debug_vis(env_cfg)
-sm.add_scene_cameras(env_cfg, preset=sm.DEFAULT_PRESET)
+# preset2=None: this script re-aims external_cam across every preset, so a second
+# world-fixed camera would just cost render time for a frame we never read.
+sm.add_scene_cameras(env_cfg, preset=sm.DEFAULT_PRESET, preset2=None)
 
 env = gym.make(TASK, cfg=env_cfg)
 env.reset()

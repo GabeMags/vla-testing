@@ -41,20 +41,23 @@ def act():
     # Wrist view if the client sends one; otherwise fall back to duplicating the third-person
     # frame, which is what we did before the wrist cam existed.
     wrist_t = to_tensor(request.files["wrist"]) if "wrist" in request.files else img_t
+    # Second third-person view for the third slot; falls back to duplicating the first so
+    # an older client that only posts image+wrist still works.
+    img2_t = to_tensor(request.files["image2"]) if "image2" in request.files else img_t
 
     instruction = request.form.get("instruction", "pick up the blue cube")
     state_str = request.form.get("state", "0,0,0,0,0,0")
     state = torch.tensor([[float(x) for x in state_str.split(",")]],
                          dtype=torch.float32, device=device)
 
-    # smolvla_base's config declares exactly camera1/2/3 (checked in the checkpoint's
-    # config.json), and VISUAL normalization is IDENTITY, so there are no per-camera stats
-    # to mismatch — the slots are interchangeable. Training datasets were mostly 2-camera
-    # (one third-person + one wrist), so we fill the third slot with the third-person view.
+    # smolvla_base's config declares exactly camera1/2/3 with empty_cameras=0 (checked in
+    # the checkpoint's config.json), so all three slots want a real tensor. VISUAL
+    # normalization is IDENTITY, so there are no per-camera stats to mismatch and the slots
+    # are interchangeable — the assignment below is just our convention.
     batch = {
-        "observation.images.camera1": img_t,     # third-person
+        "observation.images.camera1": img_t,     # third-person (default front_right)
         "observation.images.camera2": wrist_t,   # wrist
-        "observation.images.camera3": img_t,     # third slot: duplicate third-person
+        "observation.images.camera3": img2_t,    # second third-person (default front_left)
         "observation.state": state,
         "task": instruction,
     }
