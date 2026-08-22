@@ -94,9 +94,6 @@ Flags on `closed_loop.py`: `--preset` (default `front_right`), `--arm-color {whi
 Camera/color sweep without the server, writes to `frames/<date>_preview_<n>/`:
 `python scripts/smolVLA/arm_SO-100/preview_scene.py --headless --arm-color white`
 
-#### Result
-
-*(to fill in after the run)*
 
 ### 2026-07-30: Can SmolVLA pick up the cube zero shot using the SO-100/SO-101 arms?
 
