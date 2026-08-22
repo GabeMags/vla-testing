@@ -5,10 +5,9 @@ Independent research toward M.S. thesis in vision-language-action (VLA) robotic 
 ## Goals
 
 - Build foundational understanding of VLA architectures for robotic manipulation
-- Reproduce and evaluate pretrained OpenVLA in Isaac Lab simulation
+- Reproduce and evaluate pretrained OpenVLA in Isaac Lab simulation (now moved to SmolVLA)
 - Fine-tune VLA models on custom manipulation tasks via behavior cloning
 - Develop a research portfolio to demonstrate independent capability
-
 
 ## Roadmap
 - [x] Environment: Ubuntu dual-boot, NVIDIA driver, Isaac Sim + Isaac Lab smoke test
@@ -16,8 +15,10 @@ Independent research toward M.S. thesis in vision-language-action (VLA) robotic 
 - [x] OpenVLA quantized inference running locally on RTX 3070
 - [X] Run SmolVLA; compare against OpenVLA outputs
 - [X] Bridge to sim: feed an Isaac Lab camera frame into OpenVLA inference
-- [X] Closed loop: VLA actions driving the simulated Franka
-- [ ] Quantized SmolVLA: measure success rate degradation when quantized to INT8/INT4
+- [X] Closed loop: OpenVLA actions driving the simulated Franka
+(Research moved to SmolVLA actions on SO-100 arm)
+- [ ] ~~Quantized SmolVLA: measure success rate degradation when quantized to INT8/INT4~~ 
+- [ ] Achieve SmolVLA action: pick up blue cube
 - [ ] Fine-tuning (LoRA) on a custom task — needs cloud GPU or upgraded hardware
 
 ## Hardware
@@ -35,6 +36,7 @@ Independent research toward M.S. thesis in vision-language-action (VLA) robotic 
 - Isaac Lab (cloned from main)
 
  OpenVLA inference runs in a separate openvla conda env (Python 3.10) with era-pinned libraries — see requirements-openvla.txt.
+ SmolVLA inference runs in similar separate conda env with era-pinned libs
 
 ## Research Logs
 Moved to Logs.md

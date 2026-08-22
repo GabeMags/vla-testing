@@ -20,23 +20,41 @@ preprocess, postprocess = make_pre_post_processors(
 #server
 app = Flask(__name__)
 
+def to_tensor(file_storage):
+    """Bytes -> (1,3,H,W) float tensor in [0,1], at the sender's native resolution.
+
+    Deliberately no resize here. SmolVLA's prepare_images() calls resize_with_pad(512,512),
+    an aspect-preserving resize that pads left/top. Squashing to a square first would throw
+    away that letterbox: real 640x480 training frames arrive as 512x384 content with a black
+    bar on top, and we want the sim frames to land the same way.
+    """
+    img = Image.open(io.BytesIO(file_storage.read())).convert("RGB")
+    # (H,W,3) -> permute to (3,H,W), the (channels, height, width) order torch vision models
+    # expect, then normalize the 0-255 ints to 0.0-1.0 floats and add a batch dim.
+    t = torch.from_numpy(np.array(img)).permute(2, 0, 1).float() / 255.0
+    return t.unsqueeze(0).to(device)
+
+
 @app.route("/act", methods=["POST"])
 def act():
-    img = Image.open(io.BytesIO(request.files["image"].read())).convert("RGB").resize((256, 256)) #smolvla likes this resolution 256x256
-    # convert image to tensor, start as (256,256,3), then change the order of dimensions with permute to (3,256,256) which is how PyTorch vision models expect things (channels, height, width). Then normalize; convert the 0-255 integer pixel values to 0.0-1.0 floats.
-    img_t = torch.from_numpy(np.array(img)).permute(2, 0, 1).float() / 255.0
-    # Add a batch dimension. We're only doing one image per batch. (1,3,256,256)
-    img_t = img_t.unsqueeze(0).to(device)
+    img_t = to_tensor(request.files["image"])          # third-person view
+    # Wrist view if the client sends one; otherwise fall back to duplicating the third-person
+    # frame, which is what we did before the wrist cam existed.
+    wrist_t = to_tensor(request.files["wrist"]) if "wrist" in request.files else img_t
 
     instruction = request.form.get("instruction", "pick up the blue cube")
     state_str = request.form.get("state", "0,0,0,0,0,0")
     state = torch.tensor([[float(x) for x in state_str.split(",")]],
                          dtype=torch.float32, device=device)
 
+    # smolvla_base's config declares exactly camera1/2/3 (checked in the checkpoint's
+    # config.json), and VISUAL normalization is IDENTITY, so there are no per-camera stats
+    # to mismatch — the slots are interchangeable. Training datasets were mostly 2-camera
+    # (one third-person + one wrist), so we fill the third slot with the third-person view.
     batch = {
-        "observation.images.camera1": img_t,
-        "observation.images.camera2": img_t,   # duplicate one view for the other slots
-        "observation.images.camera3": img_t,
+        "observation.images.camera1": img_t,     # third-person
+        "observation.images.camera2": wrist_t,   # wrist
+        "observation.images.camera3": img_t,     # third slot: duplicate third-person
         "observation.state": state,
         "task": instruction,
     }

@@ -1,10 +1,14 @@
-# Phase 1: probe SO-ARM task's action space + joint names (loop disabled below)
+# Closed-loop SmolVLA -> IsaacSim SO-ARM100.
+# Scene is distribution-matched to SmolVLA's SO-100 training data via scene_match.py:
+# debug markers off, webcam-like 4:3 camera framing the whole arm, wrist cam, realistic
+# arm color. See scene_match.py for the reasoning behind each.
 
 # Standard library
 import argparse
 import datetime
 import io
 import os
+import sys
 
 # Third-party
 import numpy as np
@@ -16,6 +20,10 @@ from PIL import Image
 from isaaclab.app import AppLauncher
 
 parser = argparse.ArgumentParser()
+parser.add_argument("--preset", default="front_right", help="Camera preset (see scene_match.CAMERA_PRESETS).")
+parser.add_argument("--arm-color", default="white", choices=["white", "black", "yellow"])
+parser.add_argument("--no-wrist", action="store_true", help="Duplicate the third-person view into all 3 slots.")
+parser.add_argument("--steps", type=int, default=200)
 AppLauncher.add_app_launcher_args(parser)
 args_cli = parser.parse_args()
 args_cli.headless = False   # False while iterating camera pose in GUI; True for real runs
@@ -24,48 +32,29 @@ app_launcher = AppLauncher(args_cli)
 simulation_app = app_launcher.app
 
 import gymnasium as gym
-import isaaclab.sim as sim_utils
-from isaaclab.sensors import CameraCfg
 import isaaclab_tasks           # type: ignore # registers built-in Isaac Lab tasks with gym
 import isaac_so_arm101.tasks    # type: ignore # registers SO-ARM100/101 tasks (external project; import = registration)
 from isaaclab_tasks.utils import parse_env_cfg
 
-# Debug
-# so_tasks = [k for k in gym.registry.keys() if "SO" in k.upper() or "ARM" in k.upper()]
-# print("SO-ARM registered tasks:", so_tasks)
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import scene_match as sm        # type: ignore
 
 # Adjustable vars
 LENGTH_S = 30   # episode timeout (sim-seconds) before env auto-resets
 TASK = "Isaac-SO-ARM100-Lift-Cube-Play-v0"
 
-# --- build env config, then INJECT the camera into its scene ---
 env_cfg = parse_env_cfg(TASK, num_envs=1)
 env_cfg.episode_length_s = LENGTH_S
-# Debug-vis markers: config tree differs per task — inspect before disabling:
-# print(env_cfg.commands)   # then e.g. env_cfg.commands.<term>.debug_vis = False
 
-env_cfg.scene.external_cam = CameraCfg(
-    prim_path="{ENV_REGEX_NS}/external_cam",   # world-fixed (not parented to robot)
-    update_period=0.1,
-    height=256, width=256,                      # SmolVLA input res — render small, save VRAM
-    data_types=["rgb"],
-    spawn=sim_utils.PinholeCameraCfg(
-        focal_length=24.0, focus_distance=400.0,
-        horizontal_aperture=20.955, clipping_range=(0.1, 1.0e5),
-    ),
-    # Placeholder pose — overridden below by set_world_poses_from_view.
-    offset=CameraCfg.OffsetCfg(pos=(1.6, 0.0, 0.9), convention="ros"),
-)
+# --- distribution matching (all three must happen before gym.make) ---
+sm.disable_debug_vis(env_cfg)   # frame triads / goal markers never appear in training data
+sm.add_scene_cameras(env_cfg, preset=args_cli.preset, wrist=not args_cli.no_wrist)
 
 env = gym.make(TASK, cfg=env_cfg)
 obs, _ = env.reset()
 
-# Camera aim — NOTE: eye was tuned for the Franka scene; SO-ARM is much smaller,
-# so expect to re-iterate this in the GUI (closer in, lower down).
-cam = env.unwrapped.scene["external_cam"]
-eye = torch.tensor([[-0.212, -1.409, 1.294]], device=env.unwrapped.device)
-target = torch.tensor([[0.0, 0.0, 0.1]], device=env.unwrapped.device)   # workspace center-ish
-cam.set_world_poses_from_view(eyes=eye, targets=target)
+sm.aim_external_cam(env, args_cli.preset)
+sm.recolor_arm(body_color=args_cli.arm_color)   # yellow -> white PLA; servos stay black
 
 # Zero action sized from the env itself — never hardcode action dims
 zero_action = torch.zeros((1, env.action_space.shape[1]), device=env.unwrapped.device)
@@ -73,6 +62,7 @@ zero_action = torch.zeros((1, env.action_space.shape[1]), device=env.unwrapped.d
 # Debug to see if the joint names match what SmolVLA expects
 # print("action_space:", env.action_space)
 # print("joint_names:", env.unwrapped.scene["robot"].data.joint_names)
+
 
 def get_output_dir(tag):
     """Unique output dir: date_tag_counter."""
@@ -86,24 +76,40 @@ def get_output_dir(tag):
             return out_dir
         run_counter += 1
 
-out_dir = get_output_dir("soarm-lift")
+
+out_dir = get_output_dir(f"soarm-lift_{args_cli.preset}_{args_cli.arm_color}")
+
+use_wrist = not args_cli.no_wrist
+
+
+def grab(cam_name):
+    rgb = env.unwrapped.scene[cam_name].data.output["rgb"][0]
+    return rgb.cpu().numpy().astype(np.uint8)[..., :3]
+
+
+def as_png(img_np):
+    buf = io.BytesIO()
+    Image.fromarray(img_np).save(buf, format="PNG")
+    return buf.getvalue()
+
 
 for _ in range(50):          # settle physics + let camera render
     env.step(zero_action)
 
-for step in range(200):
+for step in range(args_cli.steps):
     # --- state: Isaac radians -> degrees (SO-100/LeRobot convention) ---
     joint_pos_deg = torch.rad2deg(env.unwrapped.scene["robot"].data.joint_pos[0])
     state_str = ",".join(f"{v:.4f}" for v in joint_pos_deg.cpu().numpy())
 
-    # --- frame ---
-    rgb = env.unwrapped.scene["external_cam"].data.output["rgb"][0]
-    rgb_np = rgb.cpu().numpy().astype(np.uint8)[..., :3]
-    buf = io.BytesIO(); Image.fromarray(rgb_np).save(buf, format="PNG")
+    # --- frames: send them at native 4:3; SmolVLA pad-resizes to 512x512 itself ---
+    ext = grab("external_cam")
+    files = {"image": as_png(ext)}
+    if use_wrist:
+        files["wrist"] = as_png(grab("wrist_cam"))
 
     # --- inference over HTTP ---
     r = requests.post("http://127.0.0.1:8000/act",
-                      files={"image": buf.getvalue()},
+                      files=files,
                       data={"state": state_str, "instruction": "pick up the cube"})
 
     # --- action: SmolVLA degrees -> Isaac radians; native 6-dim, no padding/scale ---
@@ -112,7 +118,9 @@ for step in range(200):
 
     print(f"step {step}: action(rad) {a.cpu().numpy().round(4)}")
     if step % 20 == 0:
-        Image.fromarray(rgb_np).save(os.path.join(out_dir, f"loop_{step:03d}.png"))
+        Image.fromarray(ext).save(os.path.join(out_dir, f"loop_{step:03d}.png"))
+        if use_wrist:
+            Image.fromarray(grab("wrist_cam")).save(os.path.join(out_dir, f"wrist_{step:03d}.png"))
 
 env.close()
 simulation_app.close()

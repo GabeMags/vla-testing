@@ -1,4 +1,102 @@
+
+
 ## Research Logs
+
+### 2026-08-22: Can SmolVLA pick up the cube zero shot using the SO-100/SO-101 arms? (pt. 3)
+
+Today I'm testing whether or not the adjustments made last session meaningfully allow SmolVLA to pick up the cube.
+
+
+### 2026-08-03: Can SmolVLA pick up the cube zero shot using the SO-100/SO-101 arms? (pt. 2)
+
+Hypothesis from last session: The camera position, arm colors, and large axis arrows on the arm were throwing the system further from distribution. 
+
+| My current arm setup |
+|---------------------|
+| ![](frames/2026-07-30_soarm-lift_0/loop_000.png) |
+
+Today I used Claude code to change those to better match SmolVLA's training data to see if there's subjective improvement in picking up a cube.
+
+All the scene-matching logic now lives in `scripts/smolVLA/arm_SO-100/scene_match.py` so the closed loop stays readable and I can A/B settings from the CLI.
+
+#### What was actually OOD
+
+Looking at the 2026-07-30 frame again, Claude found the following:
+
+1. **Debug-vis markers.** The lift task ships `debug_vis=True` on both `scene.ee_frame` and `commands.object_pose`, which paints big saturated RGB axis triads directly over the gripper. Zero training frames contain those. This was sitting right on top of the thing the model needs to look at. Off now.
+2. **Camera.** I was 1.4 m away with a 47° lens aimed at the origin — a leftover from the Franka scene. The arm was cropped and tiny. Community SO-100 rigs are a webcam ~0.4–0.6 m out, 0.25–0.45 m above the table, angled down 20–40°, whole arm in frame.
+3. **Aspect ratio.** This one I did not expect. SmolVLA's config sets `resize_imgs_with_padding=(512,512)`, and `resize_with_pad` in `modeling_smolvla.py` does an aspect-preserving resize then pads **left and top**. A real 640×480 recording therefore reaches SigLIP as 512×384 content with a 128 px black bar on top. My 256×256 square render produced **no bar at all**. Verified directly against lerobot's own function:
+
+   | render | to_tensor | after pad-resize | top letterbox |
+   |--------|-----------|------------------|:-------------:|
+   | new 640×480 | (1,3,480,640) | (1,3,512,512) | **128 px** |
+   | old 256×256 | (1,3,256,256) | (1,3,512,512) | 0 px |
+
+   So I render 4:3 now and stopped squashing to square in the server — the policy does its own resize, and letting it do so reproduces the letterbox it trained on.
+4. **Arm color.** `so_arm100.urdf` defines `3d_printed` as rgba(1.0, 0.82, 0.12) — saturated yellow. Community SO-100/101 builds are overwhelmingly white or black PLA with black STS3215 servos. The `sts3215` material was already correct at (0.1, 0.1, 0.1).
+
+Also checked and found **fine**, so I can stop worrying about them: `smolvla_base`'s own `config.json` declares exactly `camera1/2/3`, so my key names were right all along, and `normalization_mapping` has `VISUAL: IDENTITY` — images aren't normalized with dataset stats, so there are no per-camera stats to mismatch and the three slots are interchangeable.
+
+#### Camera
+
+Presets are in `scene_match.CAMERA_PRESETS`, all aimed at a target ~0.12 m above the table (aiming at the cube itself dumped a third of the frame into empty foreground and clipped the arm off the top edge — see `frames/2026-08-03_camera-preview_firstpass/`). FOV is set in degrees via `focal_length_for_hfov()` rather than raw focal length; 68° is Logitech-webcam-ish, vs. the 47° I had.
+
+| preset | distance | elevation | notes |
+|--------|:--------:|:---------:|-------|
+| `front_right` **(default)** | 0.47 m | 20° | 3/4 from the arm's right. Closest to the median community rig. |
+| `front_left` | 0.47 m | 20° | Mirror. Worth testing — the training mix isn't left/right symmetric. |
+| `front` | 0.49 m | 30° | Head-on. Best gripper-height read, weakest depth cue on y. |
+| `high_front` | 0.48 m | 45° | Better cube visibility, more foreshortened arm. |
+| `low_front` | 0.48 m | 10° | Laptop-webcam height. |
+| `legacy` | 1.93 m | 42° | The 2026-07-30 pose, kept for A/B. |
+
+I also added a **wrist camera** parented to the `gripper` link (the fixed jaw — `jaw` is the moving one), which is what the training rigs actually have and what I'd been faking by duplicating the third-person view into all three slots. It looks down the jaw axis (−y in that link's frame) with a 20° downward tilt so the grasp point lands near frame centre; at 0° tilt the jaws sat in the bottom corners and most of the frame was bare table. Slot assignment is now camera1 = third-person, camera2 = wrist, camera3 = third-person duplicate.
+
+| before (2026-07-30) | after: `front_right` | after: wrist cam |
+|---------------------|----------------------|------------------|
+| ![](frames/2026-07-30_soarm-lift_0/loop_000.png) | ![](frames/2026-08-03_camera-preview_final/external_front_right.png) | ![](frames/2026-08-03_camera-preview_final/wrist.png) |
+
+`preview_scene.py` also writes a `_pad.png` next to each frame — that's the actual 512×512 tensor SigLIP receives, black bar and all. Those are the ones to compare against real dataset frames.
+
+#### Arm color
+
+Repainted at runtime on the USD stage rather than editing the vendored URDF, so my `isaac_so_arm101` checkout stays clean and there's no URDF→USD reconversion. Useful gotcha: the importer logs `The path 3d_printed is not a valid usd path, modifying to a_d_printed`, so a name match on `3d_printed` finds nothing — `recolor_arm()` falls back to matching the URDF's source RGB, which is what actually catches it. `list_arm_materials()` dumps every shader if that ever needs debugging.
+
+Servos are left black. Note that a black arm renders mid-gray in the preview because the RTX auto-exposure lifts the whole frame when the scene darkens — the recolor is applied, it just doesn't look as dark as (0.05, 0.05, 0.05) suggests.
+
+#### Correction to the 2026-07-30 notes
+
+The wild changes in steps 51 and 68 in last session's action log was numpy switching the whole array to scientific notation because one element dropped below 1e-4. Printed with `.round(4)` the two steps are nearly identical:
+
+```
+step 50: [ 0.0055  0.0038 -0.0015 -0.0123  0.095  -0.0174]
+step 51: [ 0.004   0.0062 -0.0001 -0.0146  0.0889 -0.018 ]
+```
+
+So the policy was smooth throughout, not erratic. The real observation stands: every action was tiny (~0.6–5°), which is why the arm barely moved.
+
+#### Related finding: I'm only running 4 inferences per 200-step run
+
+`select_action` pops from an action queue and only re-runs the model when the queue empties (`_check_get_actions_condition` returns `len(queue) == 0`). With `chunk_size = n_action_steps = 50`, a 200-step run does **4** real inferences — the other 196 steps replay queued actions. This is what made the 200-step run on 2026-07-11 finish in ~5 s, which I'd flagged as suspiciously fast.
+
+It matters for reading today's results: better images only reach the model at steps 0, 50, 100, 150. Not changing it today, but worth testing `n_action_steps` lower (or `predict_action_chunk` with RTC) in a future session.
+
+#### Terminal Commands
+Assume cd into project root.
+1. `conda activate lerobot` then `python scripts/smolVLA/arm_SO-100/smolvla_server.py`
+
+Start separate terminal.
+
+2. `conda activate isaaclab` then `python scripts/smolVLA/arm_SO-100/closed_loop.py`
+
+Flags on `closed_loop.py`: `--preset` (default `front_right`), `--arm-color {white,black,yellow}` (default `white`), `--no-wrist`, `--steps`.
+
+Camera/color sweep without the server, writes to `frames/<date>_preview_<n>/`:
+`python scripts/smolVLA/arm_SO-100/preview_scene.py --headless --arm-color white`
+
+#### Result
+
+*(to fill in after the run)*
 
 ### 2026-07-30: Can SmolVLA pick up the cube zero shot using the SO-100/SO-101 arms?
 
