@@ -11,7 +11,7 @@ Today I'm testing whether or not the adjustments made last session meaningfully 
 
 Hypothesis from last session: The camera position, arm colors, and large axis arrows on the arm were throwing the system further from distribution. 
 
-| My current arm setup |
+| Arm before using AI to optimize |
 |---------------------|
 | ![](frames/2026-07-30_soarm-lift_0/loop_000.png) |
 
