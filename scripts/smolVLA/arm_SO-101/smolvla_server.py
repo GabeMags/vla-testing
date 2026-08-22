@@ -1,4 +1,6 @@
 import io, torch, numpy as np
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file
 from lerobot.datasets.lerobot_dataset import LeRobotDataset
 from lerobot.policies.factory import make_pre_post_processors
 from PIL import Image
@@ -11,11 +13,61 @@ from lerobot.policies.smolvla.modeling_smolvla import SmolVLAPolicy
 model_id = "lerobot/smolvla_base"  # <- swap checkpoint
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 policy = SmolVLAPolicy.from_pretrained(model_id).to(device).eval()
+# --- bind normalization stats explicitly -------------------------------------------------
+# The checkpoint ships its stats under dataset-namespaced keys ("so100.buffer.action.mean"),
+# but the processor configs ask for a bare "action". Nothing binds, both normalizers silently
+# pass through, and the policy returns z-scores instead of degrees -- which is why every
+# action logged before 2026-08-22 was ~100x too small (|max| ~3 instead of ~120).
+STATS_DATASET = "so100"     # "so100" is the general mix; -blue/-red are tighter single-scene
+NORMALIZE_STATE = True      # see note below
+
+_STATS_FILE = "policy_postprocessor_step_0_unnormalizer_processor.safetensors"
+try:
+    _stats_path = hf_hub_download(model_id, _STATS_FILE)
+except Exception:
+    _stats_path = hf_hub_download(model_id, _STATS_FILE, local_files_only=True)
+_raw_stats = load_file(_stats_path)
+_a_mean = _raw_stats[f"{STATS_DATASET}.buffer.action.mean"]
+_a_std = _raw_stats[f"{STATS_DATASET}.buffer.action.std"]
+
+# Why the shipped state file does not bind on its own: load_state_dict() splits each key on
+# its LAST dot, so "so100.buffer.action.mean" becomes feature "so100.buffer.action" + stat
+# "mean". The processor looks features up as "action" / "observation.state", so nothing
+# matches and both normalizers pass through. Note also that make_pre_post_processors()
+# IGNORES its dataset_stats kwarg whenever pretrained_path is given -- it goes straight to
+# PolicyProcessorPipeline.from_pretrained(), which honours only `overrides`. Supplying
+# `stats` through overrides sets _stats_explicitly_provided, and load_state_dict() then
+# deliberately preserves ours instead of overwriting with the unusable file keys.
+_action_stats = {"mean": _a_mean, "std": _a_std}
+_pre_stats = {"action": _action_stats}
+if NORMALIZE_STATE:
+    # No observation.state stats ship with the checkpoint at all. In SO-100 teleop the action
+    # is the leader arm's joint positions and the state is the follower's, so the two track
+    # each other closely -- reusing the action stats is an approximation, not ground truth.
+    # Set NORMALIZE_STATE = False to leave state unnormalized instead.
+    _pre_stats["observation.state"] = _action_stats
+
+print(f"[server] normalization stats bound from '{STATS_DATASET}'")
+print(f"[server]   action mean {[round(v, 2) for v in _a_mean.tolist()]}")
+print(f"[server]   action std  {[round(v, 2) for v in _a_std.tolist()]}")
+print(f"[server]   state normalization: {'on (action stats as proxy)' if NORMALIZE_STATE else 'off'}")
+
 preprocess, postprocess = make_pre_post_processors(
     policy.config,
     model_id,
-    preprocessor_overrides={"device_processor": {"device": str(device)}},
+    preprocessor_overrides={
+        "device_processor": {"device": str(device)},
+        "normalizer_processor": {"stats": _pre_stats},
+    },
+    postprocessor_overrides={
+        "unnormalizer_processor": {"stats": {"action": _action_stats}},
+    },
 )
+
+# Fail loudly at boot rather than silently emitting z-scores again.
+_bound = postprocess.steps[0].stats if hasattr(postprocess.steps[0], "stats") else {}
+assert "action" in _bound, f"unnormalizer did not bind action stats; got keys {list(_bound)}"
+print("[server] unnormalizer verified: action stats are live")
 
 #server
 app = Flask(__name__)

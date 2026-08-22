@@ -7,6 +7,7 @@
 import argparse
 import datetime
 import io
+import json
 import os
 import sys
 
@@ -32,6 +33,26 @@ args_cli.enable_cameras = True
 app_launcher = AppLauncher(args_cli)
 simulation_app = app_launcher.app
 
+
+# Isaac Sim's Kit app keeps non-daemon threads alive, so an uncaught Python exception does
+# NOT end the process -- it stops stepping and sits there looking like a frozen sim (and
+# ignores SIGTERM). Force a real exit so failures are visible as failures.
+def _exit_on_uncaught(exc_type, exc, tb):
+    import traceback
+    traceback.print_exception(exc_type, exc, tb)
+    try:
+        env.close()          # noqa: F821  (may not exist yet)
+    except Exception:
+        pass
+    try:
+        simulation_app.close()
+    except Exception:
+        pass
+    os._exit(1)
+
+
+sys.excepthook = _exit_on_uncaught
+
 import gymnasium as gym
 import isaaclab_tasks           # type: ignore # registers built-in Isaac Lab tasks with gym
 import isaac_so_arm101.tasks    # type: ignore # registers SO-ARM100/101 tasks (external project; import = registration)
@@ -42,6 +63,7 @@ import scene_match as sm        # type: ignore
 
 # Adjustable vars
 LENGTH_S = 30   # episode timeout (sim-seconds) before env auto-resets
+INSTRUCTION = "pick up the cube"   # recorded into run_info.json; keep the two in sync
 # This folder is SO-ARM100 only -- the arm is pinned, not a flag, so a run can never
 # be mislabelled. The SO-ARM101 copy lives in ../arm_SO-101.
 ARM = "so100"
@@ -49,6 +71,16 @@ TASK = sm.ARMS[ARM]["task"]
 
 env_cfg = parse_env_cfg(TASK, num_envs=1)
 env_cfg.episode_length_s = LENGTH_S
+
+# --- action interface: absolute joint targets, not deltas --------------------------------
+# SmolVLA emits ABSOLUTE joint positions in degrees (the checkpoint's own action mean is
+# ~[1.6, 120, 110, 57, -27, 12], i.e. a pose, not a nudge). The lift task ships arm_action
+# as scale=0.5 + use_default_offset=True, which computes
+#     target = 0.5 * action + rest_pose
+# and so reinterprets an absolute target as a half-strength delta from rest. Make the
+# commanded value the target itself.
+env_cfg.actions.arm_action.scale = 1.0
+env_cfg.actions.arm_action.use_default_offset = False
 
 # --- distribution matching (all three must happen before gym.make) ---
 sm.disable_debug_vis(env_cfg)   # frame triads / goal markers never appear in training data
@@ -63,6 +95,26 @@ if args_cli.preset2:
     sm.aim_external_cam(env, args_cli.preset2, cam_name="external_cam2")
 sm.recolor_arm(body_color=args_cli.arm_color)   # yellow -> white PLA; servos stay black
 
+# --- sanity: does our 6-dim vector line up with what Isaac expects? ----------------------
+# State order (what we send SmolVLA) and action order (what we command) are built by
+# different machinery and can disagree independently. Warn rather than fail so a run is
+# never blocked by this check.
+_EXPECTED = ["shoulder_pan", "shoulder_lift", "elbow_flex", "wrist_flex", "wrist_roll", "gripper"]
+_state_order = list(env.unwrapped.scene["robot"].data.joint_names)
+_am = env.unwrapped.action_manager
+_action_order = [j for _t in _am.active_terms for j in getattr(_am.get_term(_t), "_joint_names", [])]
+print(f"[check] state order : {_state_order}")
+print(f"[check] action order: {_action_order}")
+if _state_order != _EXPECTED:
+    print(f"[check] WARNING state order != SmolVLA convention {_EXPECTED}")
+if _action_order != _state_order:
+    print("[check] WARNING action order != state order; the 6-dim vector is not consistent")
+_arm_term = _am.get_term("arm_action")
+# _offset is a plain float 0.0 when use_default_offset=False, and a tensor when it is True.
+_off = _arm_term._offset
+_off_max = float(_off.abs().max()) if hasattr(_off, "abs") else abs(float(_off))
+print(f"[check] arm_action scale={_arm_term._scale} offset_max={_off_max:.3f}")
+
 # Zero action sized from the env itself — never hardcode action dims
 zero_action = torch.zeros((1, env.action_space.shape[1]), device=env.unwrapped.device)
 
@@ -72,19 +124,38 @@ zero_action = torch.zeros((1, env.action_space.shape[1]), device=env.unwrapped.d
 
 
 def get_output_dir(tag):
-    """Unique output dir: date_tag_counter."""
+    """Unique output dir: <date>_<tag>-<run number>, e.g. 2026-08-22_so101-lift-0."""
     base_dir = "/home/gabriel/vla-testing/frames"
     date_str = datetime.date.today().strftime("%Y-%m-%d")
     run_counter = 0
     while True:
-        out_dir = os.path.join(base_dir, f"{date_str}_{tag}_{run_counter}")
+        out_dir = os.path.join(base_dir, f"{date_str}_{tag}-{run_counter}")
         if not os.path.exists(out_dir):
             os.makedirs(out_dir, exist_ok=True)
             return out_dir
         run_counter += 1
 
 
-out_dir = get_output_dir(f"{ARM}-lift_{args_cli.preset}_{args_cli.arm_color}")
+out_dir = get_output_dir(f"{ARM}-lift")
+
+# The folder name no longer carries preset/colour, so record the run's settings beside the
+# frames -- otherwise there is no way to tell two runs apart after the fact.
+with open(os.path.join(out_dir, "run_info.json"), "w") as _f:
+    json.dump(
+        {
+            "arm": ARM,
+            "task": TASK,
+            "preset": args_cli.preset,
+            "preset2": args_cli.preset2 or None,
+            "arm_color": args_cli.arm_color,
+            "wrist_cam": not args_cli.no_wrist,
+            "steps": args_cli.steps,
+            "instruction": INSTRUCTION,
+            "started": datetime.datetime.now().isoformat(timespec="seconds"),
+        },
+        _f,
+        indent=2,
+    )
 
 use_wrist = not args_cli.no_wrist
 
@@ -119,9 +190,11 @@ for step in range(args_cli.steps):
     # --- inference over HTTP ---
     r = requests.post("http://127.0.0.1:8000/act",
                       files=files,
-                      data={"state": state_str, "instruction": "pick up the cube"})
+                      data={"state": state_str, "instruction": INSTRUCTION})
 
-    # --- action: SmolVLA degrees -> Isaac radians; native 6-dim, no padding/scale ---
+    # --- action: SmolVLA absolute degrees -> Isaac radians (native 6-dim, no padding) ---
+    # deg2rad is correct only because the server now unnormalizes to real degrees; before
+    # that fix these were z-scores and deg2rad silently shrank them ~100x.
     a = torch.deg2rad(torch.tensor(r.json()["action"], dtype=torch.float32, device=env.unwrapped.device))
     env.step(a.unsqueeze(0))
 

@@ -29,6 +29,21 @@ I'm going to investigate the base rotation first.
 |---------------------|---------------------|---------------------|
 | ![](frames/2026-08-22_so101-lift_front_right_white_0/gifs/soarm_run.gif) | ![](frames/2026-08-22_so101-lift_front_right_white_0/gifs/soarm_run_wrist.gif) | ![](frames/2026-08-22_so101-lift_front_right_white_0/gifs/soarm_run_cam2.gif)
 
+#### Attempt 4 - fixed action unnormalization + delta vs absolute (SO-101)
+I used Claude to investigate the base rotation. It wasn't the rotation — there were two separate bugs in how an action gets from SmolVLA into Isaac, and both were making the arm barely move.
+
+**1. Actions were never unnormalized (the big one).** SmolVLA is trained on z-scores, not real units, so the postprocessor is supposed to convert its output back with `real = z * std + mean`. The checkpoint stores its stats under keys like `so100.buffer.action.mean`, but the loader splits each key on its *last* dot and then looks the feature up as `action` — so nothing ever matched, and the unnormalizer silently passed the raw z-score straight through. My code then called `deg2rad` on that z-score as if it were already degrees. For wrist_roll (mean -27.42, std 59.36) a model output of 2.8 should have become `-27.42 + 2.8*59.36 = 139°`; instead it was used as 2.8°. Roughly 50x too small, no error or warning anywhere. This has been wrong since the first SO-100 run on 2026-07-30.
+
+**2. Absolute vs delta.** Note the direction here — Isaac wasn't *emitting* deltas. The state I send SmolVLA (`data.joint_pos`) was absolute all along. It's the action side: Isaac's `arm_action` term *consumes* what I send as `target = 0.5 * action + rest_pose`, so it read SmolVLA's absolute joint targets as half-strength nudges away from rest. Fixed with `scale=1.0` and `use_default_offset=False`.
+
+Result: the arm genuinely articulates now instead of twitching — mean pixel change from step 0 to step 180 went from 1.32 (attempt 3) to 13.52. It still does not grasp the cube.
+
+**Caveat on this run:** with `use_default_offset=False`, a zero action no longer means "hold position", it means "go to joint zeros" — so my 50 settle steps now drive the arm before inference even starts. Step 0 here is already 10.3 away from the true rest pose, vs 3.5 in attempt 3. Some of the motion in these gifs is the settle phase, not SmolVLA. Need to settle with `default_joint_pos` and rerun before treating this as a clean measurement.
+
+| Front Right Cam (attempt 4) | Wrist Cam (attempt 4) | Front Left Cam (attempt 4) |
+|---------------------|---------------------|---------------------|
+| ![](frames/2026-08-22_so101-lift_front_right_white_1/gifs/soarm_run.gif) | ![](frames/2026-08-22_so101-lift_front_right_white_1/gifs/soarm_run_wrist.gif) | ![](frames/2026-08-22_so101-lift_front_right_white_1/gifs/soarm_run_cam2.gif)
+
 ### 2026-08-03: Can SmolVLA pick up the cube zero shot using the SO-100/SO-101 arms? (pt. 2)
 
 Hypothesis from last session: The camera position, arm colors, and large axis arrows on the arm were throwing the system further from distribution. 
